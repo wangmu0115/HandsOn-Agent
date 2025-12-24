@@ -1,0 +1,37 @@
+[
+    {
+        "name": "Current Time Check",
+        "description": "Get the current time in a specific city",
+        "task": "What is the current time in Vancouver?"
+    },
+    {
+        "name": "Simple Weather Check",
+        "description": "Get current weather for a single city",
+        "task": "What's the weather like in Vancouver right now?"
+    },
+    {
+        "name": "Time and Weather Check",
+        "description": "Get current time and weather for a single city",
+        "task": "What's the current time and weather like in Vancouver right now?"
+    },
+    {
+        "name": "Compound Interest Calculation",
+        "description": "Calculate compound interest using code interpreter",
+        "task": "Calculate the compound interest on $5,000 invested at 6% annual interest rate for 30 years, compounded monthly."
+    },
+    {
+        "name": "Multi-City Weather Analysis",
+        "description": "Compare weather across multiple cities using real-time data",
+        "task": "Get the current weather for Tokyo, New York, London, Sydney, and Dubai. \nThen:\n1. Which city has the highest temperature?\n2. Which city has the lowest humidity?\n3. Convert all temperatures to Fahrenheit for comparison\n4. Calculate the average temperature across all cities"
+    },
+    {
+        "name": "Complex Financial Analysis",
+        "description": "Multi-step financial calculation with currency conversion",
+        "task": "A company has the following quarterly revenues:\n- Q1: $2,500,000 USD\n- Q2: €2,100,000 EUR\n- Q3: £1,800,000 GBP\n- Q4: ¥380,000,000 JPY\n\nPlease:\n1. Convert all revenues to USD\n2. Calculate the total annual revenue in USD\n3. Determine the average quarterly revenue\n4. Find which quarter had the highest revenue\n5. If the company has a 20% profit margin, calculate the annual profit in USD"
+    },
+    {
+        "name": "Global Time Zone Coordination",
+        "description": "Coordinate meeting times across time zones",
+        "task": "We need to schedule a global meeting with offices in:\n- San Francisco (PST)\n- New York (EST)\n- London (GMT/BST)\n- Tokyo (JST)\n- Sydney (AEST)\n\nIf the meeting is at 2 PM London time:\n1. What time would it be in each city?\n2. Is this during normal business hours (9 AM - 5 PM) for each location?\n3. Suggest a better time that works for most offices"
+    }
+]
