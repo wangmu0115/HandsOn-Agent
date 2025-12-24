@@ -1,5 +1,3 @@
-import functools
-import itertools
 import json
 import logging
 import platform
@@ -7,7 +5,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+import ollama
 from ollama_native import OllamaNativeAgent
+from tools import ToolRegistry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,8 +60,6 @@ class ToolCallingAgent:
 
     def _init_ollama(self):
         try:
-            import ollama
-
             client = ollama.Client()  # Check if Ollama is running
             try:
                 models_response = client.list()
@@ -129,7 +127,15 @@ def run_single_task(agent: ToolCallingAgent, task: str, stream: bool = True):
 
 def interactive_mode(agent: ToolCallingAgent, stream: bool = True):
     """Run interactive chat mode with optional streaming."""
-    pass
+    print("\n" + "=" * 80)
+    print("💬 INTERACTIVE MODE" + (" (STREAMING)" if stream else ""))
+    print("=" * 80)
+    print("\nYou can now chat with the AI agent. It has access to various tools:")
+    # Show available tools
+    tools = ToolRegistry().get_tool_schemas()
+    for i, tool in enumerate(tools, 1):
+        func = tool["function"]
+        print(f"  {i}. {func['name']}: {func['description']}")
 
 
 def main():
@@ -212,9 +218,13 @@ def _add_args():
     import argparse
 
     parser = argparse.ArgumentParser(description="Universal Tool Calling Agent - Works on all platforms")
-    parser.add_argument("--mode", choices=["single", "interactive"], default="interactive", help="Execution mode (default: interactive)")
+    parser.add_argument(
+        "--mode", choices=["single", "interactive"], default="interactive", help="Execution mode (default: interactive)"
+    )
     parser.add_argument("--task", type=str, help="Task to execute (for single mode)")
-    parser.add_argument("--backend", choices=["vllm", "ollama", "auto"], default="auto", help="Backend to use (default: auto-detect)")
+    parser.add_argument(
+        "--backend", choices=["vllm", "ollama", "auto"], default="auto", help="Backend to use (default: auto-detect)"
+    )
     parser.add_argument("--info", action="store_true", help="Show system information and exit")
     parser.add_argument("--stream", action="store_true", default=True, help="Enable streaming mode (default: True)")
     parser.add_argument("--no-stream", action="store_true", help="Disable streaming mode")

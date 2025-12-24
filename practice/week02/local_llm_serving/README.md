@@ -8,8 +8,10 @@ packages
 
 pip3 install torch torchvision
 pip install ollama
+pip install httpx
 
 
 
 torch >= 2.9.0
 ollama >= 0.6.0
+httpx >= 0.27
