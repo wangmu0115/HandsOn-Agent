@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from typing import Callable
 
@@ -37,6 +38,17 @@ class ToolRegistry:
     def register_tool(self, name: str, function: Callable, description: str, parameters: dict):
         """Register a new tool."""
         self.tools[name] = Tool(name, function, description, parameters)
+
+    def execute_tool(self, name: str, args: dict[str, any]) -> str:
+        """Execute a tool by name with given arguments"""
+        tool = self.tools.get(name, None)
+        if tool is None:
+            return json.dumps({"error": f"Tool `{name}` not found."})
+        try:
+            result = tool.function(**args)
+            return json.dumps(result) if isinstance(result, (dict, list)) else str(result)
+        except Exception as e:
+            return json.dumps({"error": str(e)})
 
     def get_tool_schemas(self) -> list[dict]:
         """Get OpenAI-compatible tool schemas."""
