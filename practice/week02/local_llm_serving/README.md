@@ -9,9 +9,12 @@ packages
 pip3 install torch torchvision
 pip install ollama
 pip install httpx
+pip install PyPDF2
 
 
 
 torch >= 2.9.0
 ollama >= 0.6.0
 httpx >= 0.27
+
+PyPDF2 >= 3.0.0

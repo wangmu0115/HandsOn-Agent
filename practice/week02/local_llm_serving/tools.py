@@ -1,7 +1,12 @@
 from dataclasses import dataclass
 from typing import Callable
 
-from builtin_tools.get_current_temperature import get_current_temperature
+from builtin_tools import (
+    code_interpreter,
+    convert_currency,
+    get_current_temperature,
+    get_current_time,
+)
 
 
 @dataclass
@@ -56,5 +61,59 @@ class ToolRegistry:
                     },
                 },
                 "required": ["location", "unit"],
+            },
+        )
+        self.register_tool(
+            name="get_current_time",
+            function=get_current_time,
+            description="Get the current date and time in a specific timezone",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "timezone": {
+                        "type": "string",
+                        "description": "Timezone name (e.g., 'America/New_York', 'Europe/London', 'Asia/Shanghai'). Use standard IANA timezone names.",
+                        "default": "UTC",
+                    }
+                },
+                "required": [],
+            },
+        )
+        self.register_tool(
+            name="convert_currency",
+            function=convert_currency,
+            description="Convert an amount from one currency to another. You MUST use this tool to convert currencies in order to get the latest exchange rate.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "amount": {
+                        "type": "number",
+                        "description": "Amount to convert",
+                    },
+                    "from_currency": {
+                        "type": "string",
+                        "description": "Source currency code (e.g., 'USD', 'EUR')",
+                    },
+                    "to_currency": {
+                        "type": "string",
+                        "description": "Target currency code (e.g., 'USD', 'EUR')",
+                    },
+                },
+                "required": ["amount", "from_currency", "to_currency"],
+            },
+        )
+        self.register_tool(
+            name="code_interpreter",
+            function=code_interpreter,
+            description="Execute Python code for calculations and data processing. You MUST use this tool to perform any complex calculations or data processing.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Python code to execute",
+                    }
+                },
+                "required": ["code"],
             },
         )
