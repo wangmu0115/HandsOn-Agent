@@ -3,9 +3,10 @@ import json
 import platform
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 
 from agent import ToolCallingAgent
+from ollama_native import ChatResponseChunk
 from tools import ToolRegistry
 
 
@@ -64,10 +65,60 @@ def run_single_task(agent: ToolCallingAgent, task: str, stream: bool = True):
     print("\n" + "=" * 80)
     print("TASK EXECUTION")
     print("=" * 80)
-    # print(f"\n📋 Task: {task}")
-    # print("-" * 80)
     if stream:
-        pass
+        print("\n⏳ Processing (streaming)...\n")
+
+        response_chunks = []
+        thinking_shown = False
+        tools_shown = False
+        response_started = False
+        last_chunk_type = None
+
+        resp_chunks = agent.chat(task, use_tools=True, stream=True)
+
+        for chunk in resp_chunks:
+            chunk_type = chunk.type
+            content = chunk.content
+            match chunk_type:
+                case "thinking":
+                    if not thinking_shown:
+                        print("🧠 Thinking: ", end="", flush=True)
+                        thinking_shown = True
+                    # Stream thinking character by character in gray
+                    print(f"\033[90m{content}\033[0m", end="", flush=True)
+                case "tool_call":
+                    if not tools_shown:
+                        print("\n\n🔧 Tool Calls:")
+                        tools_shown = True
+                    # Display tool call info
+                    tool_info = content
+                    print(f"  → {tool_info.get('name', 'unknown')}: {tool_info.get('arguments', {})}")
+                    # Reset response_started flag after tool calls
+                    response_started = False
+                case "tool_result":
+                    # Display tool result
+                    result_str = str(content)
+                    print(f"    ✓ {result_str}")
+                    # Reset response_started flag after tool results
+                    response_started = False
+                case "answer":
+                    if not response_started:
+                        # Check if this is content after tool execution
+                        if last_chunk_type in ["tool_result", "tool_call"]:
+                            print("\n🤖 Assistant: ", end="", flush=True)
+                        elif thinking_shown or tools_shown:
+                            print("\n\n🤖 Assistant: ", end="", flush=True)
+                        else:
+                            print("🤖 Assistant: ", end="", flush=True)
+                        response_started = True
+                    # Stream the actual response content
+                    print(content, end="", flush=True)
+                    response_chunks.append(content)
+                case "error":
+                    print(f"\n❌ Error: {content}")
+            last_chunk_type = chunk_type
+        print("-" * 60)
+
     else:
         print("\n⏳ Processing...")
         response = agent.chat(task, use_tools=True, stream=False)

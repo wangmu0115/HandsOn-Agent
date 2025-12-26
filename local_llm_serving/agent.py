@@ -1,14 +1,14 @@
 import logging
 import platform
 import sys
-from typing import Literal, Union
+from typing import Iterator, Literal, Union, overload
 
 import ollama
 import torch
-from ollama_native import OllamaNativeAgent
+from ollama_native import ChatResponseChunk, OllamaNativeAgent
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
@@ -26,7 +26,39 @@ class ToolCallingAgent:
         self.backend_type = backend or self._choose_best_backend()
         self._initialize_backend()
 
-    def chat(self, message: str, use_tools: bool = True, stream: bool = False, **kwargs) -> str:
+    def reset_conversation(self):
+        """Reset conversation history"""
+        if hasattr(self.agent, "reset_conversation"):
+            self.agent.reset_conversation()
+
+    @overload
+    def chat(
+        self,
+        message: str,
+        *,
+        use_tools: bool = True,
+        stream: Literal[True] = True,
+        **kwargs,
+    ) -> Iterator[ChatResponseChunk]: ...
+
+    @overload
+    def chat(
+        self,
+        message: str,
+        *,
+        use_tools: bool = True,
+        stream: Literal[False] = False,
+        **kwargs,
+    ) -> str: ...
+
+    def chat(
+        self,
+        message: str,
+        *,
+        use_tools: bool = True,
+        stream: bool = False,
+        **kwargs,
+    ) -> Union[str | Iterator[ChatResponseChunk]]:
         """
         Send a message to the agent
 
@@ -42,11 +74,6 @@ class ToolCallingAgent:
         if not self.agent:
             raise RuntimeError("Agent not initialized.")
         return self.agent.chat(message, use_tools=use_tools, stream=stream, **kwargs)
-
-    def reset_conversation(self):
-        """Reset conversation history"""
-        if hasattr(self.agent, "reset_conversation"):
-            self.agent.reset_conversation()
 
     def _choose_best_backend(self) -> str:
         system = platform.system()
@@ -83,5 +110,5 @@ class ToolCallingAgent:
 
             self.agent = OllamaNativeAgent(self.model)
         except Exception as e:
-            logger.error(f"Ollama is not running: {e}")
+            logger.exception("Ollama is not running: %s", e)
             sys.exit(1)
