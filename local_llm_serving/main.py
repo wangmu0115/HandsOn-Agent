@@ -3,10 +3,9 @@ import json
 import platform
 import sys
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Optional
 
 from agent import ToolCallingAgent
-from ollama_native import ChatResponseChunk
 from tools import ToolRegistry
 
 
@@ -66,59 +65,34 @@ def run_single_task(agent: ToolCallingAgent, task: str, stream: bool = True):
     print("TASK EXECUTION")
     print("=" * 80)
     if stream:
-        print("\n⏳ Processing (streaming)...\n")
-
-        response_chunks = []
-        thinking_shown = False
-        tools_shown = False
-        response_started = False
-        last_chunk_type = None
-
+        print("\n⏳ Processing (streaming)...")
         resp_chunks = agent.chat(task, use_tools=True, stream=True)
 
+        last_chunk_type = None
         for chunk in resp_chunks:
-            chunk_type = chunk.type
             content = chunk.content
-            match chunk_type:
+            match chunk.type:
                 case "thinking":
-                    if not thinking_shown:
-                        print("🧠 Thinking: ", end="", flush=True)
-                        thinking_shown = True
+                    if last_chunk_type is None or last_chunk_type != "thinking":
+                        print("\n🧠 Thinking: ", end="", flush=True)
                     # Stream thinking character by character in gray
                     print(f"\033[90m{content}\033[0m", end="", flush=True)
                 case "tool_call":
-                    if not tools_shown:
-                        print("\n\n🔧 Tool Calls:")
-                        tools_shown = True
-                    # Display tool call info
+                    print("\n\n🔧 Tool Calls:")
                     tool_info = content
-                    print(f"  → {tool_info.get('name', 'unknown')}: {tool_info.get('arguments', {})}")
-                    # Reset response_started flag after tool calls
-                    response_started = False
+                    print(f"  → {tool_info.get('name', 'unknown')}: {tool_info.get('args', {})}")
                 case "tool_result":
-                    # Display tool result
-                    result_str = str(content)
-                    print(f"    ✓ {result_str}")
-                    # Reset response_started flag after tool results
-                    response_started = False
+                    print(f"    ✓ {content!s}")
                 case "answer":
-                    if not response_started:
-                        # Check if this is content after tool execution
-                        if last_chunk_type in ["tool_result", "tool_call"]:
-                            print("\n🤖 Assistant: ", end="", flush=True)
-                        elif thinking_shown or tools_shown:
-                            print("\n\n🤖 Assistant: ", end="", flush=True)
-                        else:
-                            print("🤖 Assistant: ", end="", flush=True)
-                        response_started = True
-                    # Stream the actual response content
+                    if last_chunk_type is None or last_chunk_type != "answer":
+                        print("\n\n🤖 Assistant: ", end="", flush=True)
                     print(content, end="", flush=True)
-                    response_chunks.append(content)
                 case "error":
                     print(f"\n❌ Error: {content}")
-            last_chunk_type = chunk_type
-        print("-" * 60)
-
+                case _ as t:
+                    print(f"\n❌ Error: Unknow chunk type: {t}")
+            last_chunk_type = chunk.type
+        print("\n" + "-" * 60)
     else:
         print("\n⏳ Processing...")
         response = agent.chat(task, use_tools=True, stream=False)
@@ -166,8 +140,16 @@ def interactive_mode(agent: ToolCallingAgent, stream: bool = True):
                     show_sample_tasks()
                     print("\n💡 Tip: Use /sample <n> to run a specific sample (e.g., /sample 1)")
                     continue
-                case _:
-                    print(123)
+                case _ as sample_commond:
+                    sample_num = int(sample_commond.split()[1])
+
+                    if 1 <= sample_num <= len(get_sample_tasks()):
+                        selected_sample = get_sample_tasks()[sample_num - 1]
+                        run_single_task(agent, selected_sample["task"], streaming_enabled)
+                    else:
+                        print(f"❌ Invalid sample number. Please choose between 1 and {len(get_sample_tasks())}")
+                        print("Use /samples to see available samples")
+                        continue
 
         except KeyboardInterrupt:
             print("\n\n👋 Goodbye!")
