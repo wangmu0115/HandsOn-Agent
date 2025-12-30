@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from builtin_tools import (
     code_interpreter,
@@ -39,7 +39,7 @@ class ToolRegistry:
         """Register a new tool."""
         self.tools[name] = Tool(name, function, description, parameters)
 
-    def execute_tool(self, name: str, args: dict[str, any]) -> str:
+    def execute_tool(self, name: str, args: dict[str, Any]) -> str:
         """Execute a tool by name with given arguments"""
         tool = self.tools.get(name, None)
         if tool is None:
