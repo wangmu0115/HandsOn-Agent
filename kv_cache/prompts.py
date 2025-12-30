@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from constants import KVCacheMode
+from kv_cache._base import KVCacheMode
 
 
 def get_system_prompt(mode: KVCacheMode) -> str:

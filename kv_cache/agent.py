@@ -2,12 +2,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from constants import KVCacheMode
 from messages import SystemMessage, UserMessage
 from openai import OpenAI
 from tools import ToolRegistry
 
-from kv_cache.prompt_templates import get_system_prompt
+from kv_cache._base import KVCacheMode
+from kv_cache.prompts import get_system_prompt
 
 
 @dataclass
@@ -87,16 +87,29 @@ class KVCacheAgent:
 
     def _format_messages(self, task: str):
         messages = []
-
         messages.append(SystemMessage(get_system_prompt(self.mode)))
         if self.mode == KVCacheMode.DYNAMIC_PROFILE:
+            # User profile message for dynamic profile mode
             self.user_credits -= 1
             messages.append(UserMessage(f"[User Profile: Premium user with {self.user_credits} credits remaining]"))
-        elif self.mode == KVCacheMode.SLIDING_WINDOW:
-            # Preserve all system and user messages, at the most recent 6 messages
-            if self.conversation_history:
-                # Include all system and user messages, and if there are at least 6 messages, include the last 6 messages regardless of role
-                system_user_msgs = [msg for msg in self.conversation_history if msg.get("role") in ("system", "user")]
-                messages.extend(system_user_msgs)
-                if len(self.conversation_history) >= 6:
-                    messages.extend(self.conversation_history[-6:])
+
+        match self.mode:
+            case KVCacheMode.SLIDING_WINDOW:
+                # Preserve all system and user messages, at the most recent 6 messages
+                if self.conversation_history:
+                    # Include all system and user messages, and if there are at least 6 messages, include the last 6 messages regardless of role
+                    system_user_messages = [m for m in self.conversation_history if isinstance(m, SystemMessage | UserMessage)]
+                    messages.extend(system_user_messages)
+                    if len(self.conversation_history) > 6:
+                        messages.extend(self.conversation_history[-6:])
+            case KVCacheMode.TEXT_FORMAT:
+                # Format all history as plain text (breaks KV cache)
+                # Reformatting each time breaks structured format
+                if self.conversation_history:
+                    history_text = "Previous conversation:\n"
+
+            case _:
+                # For CORRECT, DYNAMIC_SYSTEM, SHUFFLED_TOOLS, DYNAMIC_PROFILE modes, include full history conversation
+                messages.extend(self.conversation_history)
+        # Add current task (always at the end)
+        messages.append(UserMessage(task))
