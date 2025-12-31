@@ -1,10 +1,12 @@
 from typing import TYPE_CHECKING
 
-from kv_cache._import_utils import import_attr
+from _import_utils import import_attr
 
 if TYPE_CHECKING:
+    from messages.ai import AIMessage
     from messages.base import BaseMessage, message_to_dict, messages_to_dict
     from messages.system import SystemMessage
+    from messages.tool import ToolMessage
     from messages.user import UserMessage
 
 __all__ = [
@@ -13,6 +15,8 @@ __all__ = [
     "messages_to_dict",
     "SystemMessage",
     "UserMessage",
+    "AIMessage",
+    "ToolMessage",
 ]
 
 _dynamic_imports = {
@@ -21,6 +25,8 @@ _dynamic_imports = {
     "messages_to_dict": "base",
     "SystemMessage": "system",
     "UserMessage": "user",
+    "AIMessage": "ai",
+    "ToolMessage": "tool",
 }
 
 

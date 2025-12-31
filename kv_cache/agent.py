@@ -2,11 +2,13 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from _base import KVCacheMode
 from messages import SystemMessage, UserMessage
 from openai import OpenAI
 from tools import ToolRegistry
 
-from kv_cache._base import KVCacheMode
+from kv_cache.messages.ai import AIMessage
+from kv_cache.messages.tool import ToolMessage
 from kv_cache.prompts import get_system_prompt
 
 
@@ -78,12 +80,19 @@ class KVCacheAgent:
             #   - Forces complete context reconstruction → KV cache invalidated
             #   - Within an iteration, we still append to messages for proper API flow
             #   - But at the start of each new iteration, we rebuild from scratch
+            if self.mode == KVCacheMode.CORRECT:
+                if iteration == 1:
+                    messages = self._format_messages(original_task)
+            else:
+                messages = self._format_messages(original_task)
 
-            match self.mode:
-                case KVCacheMode.CORRECT:
-                    ...
-                case _:
-                    ...
+            req_data = {
+
+            }
+
+            self.client.chat.completions.create()
+
+            
 
     def _format_messages(self, task: str):
         messages = []
@@ -107,7 +116,14 @@ class KVCacheAgent:
                 # Reformatting each time breaks structured format
                 if self.conversation_history:
                     history_text = "Previous conversation:\n"
-
+                    for m in self.conversation_history:
+                        if isinstance(m, AIMessage):
+                            ...
+                        elif isinstance(m, ToolMessage):
+                            history_text += f"TOOL RESPONSE: {m.content}\n"
+                        else:
+                            if m.content:
+                                history_text += f"{m.type}: {m.content} \n"
             case _:
                 # For CORRECT, DYNAMIC_SYSTEM, SHUFFLED_TOOLS, DYNAMIC_PROFILE modes, include full history conversation
                 messages.extend(self.conversation_history)
