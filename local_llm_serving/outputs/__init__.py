@@ -3,30 +3,14 @@ from typing import TYPE_CHECKING
 from _import_utils import import_attr
 
 if TYPE_CHECKING:
-    from messages.ai import AIMessage
-    from messages.base import BaseMessage, message_to_dict, messages_to_dict
-    from messages.system import SystemMessage
-    from messages.tool import ToolMessage
-    from messages.user import UserMessage
+    from outputs.chat_generation import ChatGenerationChunk
 
 __all__ = [
-    "BaseMessage",
-    "message_to_dict",
-    "messages_to_dict",
-    "SystemMessage",
-    "UserMessage",
-    "AIMessage",
-    "ToolMessage",
+    "ChatGenerationChunk",
 ]
 
 _dynamic_imports = {
-    "BaseMessage": "base",
-    "message_to_dict": "base",
-    "messages_to_dict": "base",
-    "SystemMessage": "system",
-    "UserMessage": "user",
-    "AIMessage": "ai",
-    "ToolMessage": "tool",
+    "ChatGenerationChunk": "chat_generation",
 }
 
 

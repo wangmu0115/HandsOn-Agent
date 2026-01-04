@@ -83,8 +83,8 @@ def run_single_task(agent: ToolCallingAgent, task: str, stream: bool = True):
                     print(f"  → {tool_info.get('name', 'unknown')}: {tool_info.get('args', {})}")
                 case "tool_result":
                     print(f"    ✓ {content!s}")
-                case "answer":
-                    if last_chunk_type is None or last_chunk_type != "answer":
+                case "final":
+                    if last_chunk_type is None or last_chunk_type != "final":
                         print("\n\n🤖 Assistant: ", end="", flush=True)
                     print(content, end="", flush=True)
                 case "error":
