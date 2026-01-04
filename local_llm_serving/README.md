@@ -10,6 +10,7 @@ pip3 install torch torchvision
 pip install ollama
 pip install httpx
 pip install PyPDF2
+pip install colorlog
 
 
 

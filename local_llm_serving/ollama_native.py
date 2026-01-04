@@ -1,18 +1,22 @@
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from typing import Iterator, Literal, Optional, Sequence, Union
 
 import ollama
+from loggers import setup_logger
+from messages import (
+    AIMessage,
+    BaseMessage,
+    ToolMessage,
+    UserMessage,
+    messages_to_dict,
+    tool_call,
+)
 from ollama import Message
 from tools import ToolRegistry
 
-logging.basicConfig(
-    level=logging.WARN,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__, "INFO")
 
 
 @dataclass
@@ -76,7 +80,7 @@ class OllamaNativeAgent:
         self.model = model
         self.client = ollama.Client()
         self.tool_register = ToolRegistry()
-        self.conversation_history = []
+        self.conversation_history: list[BaseMessage] = []
 
     def reset_conversation(self):
         """Reset the conversation history"""
@@ -105,48 +109,48 @@ class OllamaNativeAgent:
             return self.chat_stream(message, use_tools=use_tools, temperature=temperature)
 
         # Add use message to history
-        self.conversation_history.append(Chat.user(message).asdict())
+        self.conversation_history.append(UserMessage(message))
         tools = self.tool_register.get_tool_schemas() if use_tools else None
 
         try:
             # Call Ollama with tools
-            resp = self.client.chat(
+            response = self.client.chat(
                 self.model,
-                self.conversation_history,
+                messages_to_dict(self.conversation_history),
                 tools=tools,
                 options={"temperature": temperature},
             )
-
-            message_content = resp.message
-            tool_calls = message_content.tool_calls
-            if tool_calls is not None and len(tool_calls) > 0:  # Handle tool calls
-                logger.info(f"Model requested {len(tool_calls)} tool call(s).")
+            response_message = response.message
+            if response_message.tool_calls:  # Handle tool calls
+                logger.info("Model requested %d tool call(s).", len(response_message.tool_calls))
                 # Add assistant's message with tool calls to history
-                self.conversation_history.append(Chat.assistant(message_content.thinking or "", tool_calls).asdict())
-                for tool_call in tool_calls:
-                    name = tool_call.function.name
-                    args = tool_call.function.arguments
-                    logger.info(f"Executing tool: {name} with args: {args}")
-                    result = self.tool_register.execute_tool(name, args)
-                    # Add tool result to history
-                    self.conversation_history.append(Chat.tool(result).asdict())
+                ai_message = AIMessage(response_message.thinking or "")
+                ai_message.tool_calls = [tool_call(name=t.function.name, arguments=t.function.arguments) for t in response_message.tool_calls]
+                self.conversation_history.append(ai_message)
 
-                final_resp = self.client.chat(
+                for tc in response_message.tool_calls:
+                    name = tc.function.name
+                    args = tc.function.arguments
+                    result = self.tool_register.execute_tool(name, args)
+                    logger.info("Executing tool: %s with args: %s, result: %s", name, args, result)
+                    # Add tool result to history
+                    self.conversation_history.append(ToolMessage(result))
+
+                final_response = self.client.chat(
                     self.model,
-                    self.conversation_history,
+                    messages_to_dict(self.conversation_history),
                     tools=tools,
                     options={"temperature": temperature},
                 )
-                final_message = final_resp.message
+                final_response_message = final_response.message
                 # Add final response to history
-                self.conversation_history.append(Chat.assistant(final_message.content).asdict())
-                return final_message.content
+                self.conversation_history.append(AIMessage(final_response_message.content))
+                return final_response_message.content
             else:  # No tool calls
-                content = message_content.content
-                self.conversation_history.append(Chat.assistant(content).asdict())
-                return content
+                self.conversation_history.append(AIMessage(response_message.content))
+                return response_message.content
         except Exception as e:
-            logger.exception("Error in chat: %s", e)
+            logger.exception("Error in chat:", e)
             return f"Error: {e}"
 
     def chat_stream(

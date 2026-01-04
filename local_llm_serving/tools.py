@@ -1,6 +1,5 @@
 import json
-from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from builtin_tools import (
     code_interpreter,
@@ -10,20 +9,59 @@ from builtin_tools import (
 )
 
 
-@dataclass
 class Tool:
-    name: str
-    function: Callable
-    description: str
-    parameters: dict
+    class Parameter:
+        def __init__(
+            self,
+            name: str,
+            type: str,
+            description: str,
+            *,
+            enums: Optional[list] = None,
+            required: bool = False,
+            default: Any = None,
+        ):
+            self.name = name
+            self.type = type
+            self.description = description
+            self.enums = enums
+            self.required = required
+            self.default = default
 
-    def schema(self) -> dict:
+        def asdict(self, with_name: bool = False):
+            d = dict(type=self.type, description=self.description)
+            if not self.required:
+                d["default"] = self.default
+            if self.enums is not None:
+                d["enum"] = self.enums
+            if with_name:
+                d["name"] = self.name
+            return d
+
+    def __init__(
+        self,
+        *,
+        function: Callable,
+        description: str,
+        name: Optional[str] = None,
+        parameters: list[Parameter] = None,
+    ):
+        self.name = name or function.__name__
+        self.function = function
+        self.description = description
+        self.parameters = parameters or []
+
+    def get_schema(self) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
                 "name": self.name,
                 "description": self.description,
-                "parameters": self.parameters,
+                "parameters": {
+                    "type": "object",
+                    "properties": {p.name: p.asdict() for p in self.parameters},
+                    "required": [p.name for p in self.parameters if p.required],
+                },
             },
         }
 
@@ -31,13 +69,17 @@ class Tool:
 class ToolRegistry:
     """Registry for managing available tools"""
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.tools: dict[str, Tool] = dict()
-        self._register_default_tools()
+        _register_default_tools(self)
 
-    def register_tool(self, name: str, function: Callable, description: str, parameters: dict):
+    def register_tool(self, tool: Tool):
         """Register a new tool."""
-        self.tools[name] = Tool(name, function, description, parameters)
+        self.tools[tool.name] = tool
+
+    def get_tool_schemas(self):
+        """Get OpenAI-compatible tool schemas."""
+        return [tool.get_schema() for tool in self.tools.values()]
 
     def execute_tool(self, name: str, args: dict[str, Any]) -> str:
         """Execute a tool by name with given arguments"""
@@ -50,82 +92,66 @@ class ToolRegistry:
         except Exception as e:
             return json.dumps({"error": str(e)})
 
-    def get_tool_schemas(self) -> list[dict]:
-        """Get OpenAI-compatible tool schemas."""
-        return [tool.schema() for tool in self.tools.values()]
 
-    def _register_default_tools(self):
-        self.register_tool(
-            name="get_current_temperature",
+def _register_default_tools(tool_registry: ToolRegistry):
+    """Register Tools"""
+    tool_registry.register_tool(
+        Tool(
             function=get_current_temperature,
             description="Get the current temperature for a specific location",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The city and country, e.g., 'Paris, France'",
-                    },
-                    "unit": {
-                        "type": "string",
-                        "enum": ["celsius", "fahrenheit"],
-                        "description": "The temperature unit to use (by default, celsius)",
-                    },
-                },
-                "required": ["location", "unit"],
-            },
+            name="get_current_temperature",
+            parameters=[
+                Tool.Parameter(
+                    "location",
+                    "string",
+                    "The city and country, e.g., 'Paris, France'",
+                    required=True,
+                ),
+                Tool.Parameter(
+                    "unit",
+                    "string",
+                    "The temperature unit to use (by default, celsius)",
+                    enums=["celsius", "fahrenheit"],
+                    default="celsius",
+                ),
+            ],
         )
-        self.register_tool(
-            name="get_current_time",
+    )
+
+    tool_registry.register_tool(
+        Tool(
             function=get_current_time,
             description="Get the current date and time in a specific timezone",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "timezone": {
-                        "type": "string",
-                        "description": "Timezone name (e.g., 'America/New_York', 'Europe/London', 'Asia/Shanghai'). Use standard IANA timezone names.",
-                        "default": "UTC",
-                    }
-                },
-                "required": [],
-            },
+            name="get_current_time",
+            parameters=[
+                Tool.Parameter(
+                    "timezone",
+                    "string",
+                    "Timezone name (e.g., 'America/New_York', 'Europe/London', 'Asia/Shanghai'). Use standard IANA timezone names.",
+                    default="UTC",
+                )
+            ],
         )
-        self.register_tool(
-            name="convert_currency",
+    )
+
+    tool_registry.register_tool(
+        Tool(
             function=convert_currency,
             description="Convert an amount from one currency to another. You MUST use this tool to convert currencies in order to get the latest exchange rate.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "amount": {
-                        "type": "number",
-                        "description": "Amount to convert",
-                    },
-                    "from_currency": {
-                        "type": "string",
-                        "description": "Source currency code (e.g., 'USD', 'EUR')",
-                    },
-                    "to_currency": {
-                        "type": "string",
-                        "description": "Target currency code (e.g., 'USD', 'EUR')",
-                    },
-                },
-                "required": ["amount", "from_currency", "to_currency"],
-            },
+            name="convert_currency",
+            parameters=[
+                Tool.Parameter("amount", "number", "Amount to convert", required=True),
+                Tool.Parameter("from_currency", "string", "Source currency code (e.g., 'USD', 'EUR')", required=True),
+                Tool.Parameter("to_currency", "string", "Target currency code (e.g., 'USD', 'EUR')", required=True),
+            ],
         )
-        self.register_tool(
-            name="code_interpreter",
+    )
+
+    tool_registry.register_tool(
+        Tool(
             function=code_interpreter,
             description="Execute Python code for calculations and data processing. You MUST use this tool to perform any complex calculations or data processing.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "Python code to execute",
-                    }
-                },
-                "required": ["code"],
-            },
+            name="code_interpreter",
+            parameters=[Tool.Parameter("code", "string", "Python code to execute", required=True)],
         )
+    )
