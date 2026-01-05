@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from messages.base import BaseMessage
+from athena_core.messages.base import BaseMessage
 
 
 class UserMessage(BaseMessage):

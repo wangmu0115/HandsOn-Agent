@@ -2,8 +2,8 @@
 
 from typing import Any, Literal
 
-from messages.base import BaseMessage
-from messages.tool import ToolCall
+from athena_core.messages.base import BaseMessage
+from athena_core.messages.tool import ToolCall
 
 
 class AIMessage(BaseMessage):

@@ -9,7 +9,7 @@ import colorlog
 loggerLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 
 
-def setup_logger(name: str = "vector_search", level: loggerLevel = "DEBUG") -> logging.Logger:
+def setup_logger(name: str, level: loggerLevel = "INFO") -> logging.Logger:
     """
     Set up a colorful and informative logger
 

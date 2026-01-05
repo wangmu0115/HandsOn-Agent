@@ -1,6 +1,6 @@
 from typing import Any, Literal, TypedDict
 
-from messages.base import BaseMessage
+from athena_core.messages.base import BaseMessage
 
 
 class ToolMessage(BaseMessage):

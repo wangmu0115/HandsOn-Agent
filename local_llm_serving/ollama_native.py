@@ -6,8 +6,8 @@ Uses Ollama's standard tool calling API (requires compatible models)
 from typing import Iterator, Union
 
 import ollama
-from loggers import setup_logger
-from messages import (
+from athena_core.loggers import setup_logger
+from athena_core.messages import (
     AIMessage,
     BaseMessage,
     ToolMessage,

@@ -2,7 +2,7 @@ import sys
 from typing import Iterator, Literal, Union, overload
 
 import ollama
-from loggers import setup_logger
+from athena_core.loggers import setup_logger
 from ollama_native import OllamaNativeAgent
 from outputs import ChatGenerationChunk
 

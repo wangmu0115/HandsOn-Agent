@@ -1,45 +1,15 @@
-import dataclasses
-import logging
-from dataclasses import dataclass, field
-from typing import Optional
+import time
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BatchEncoding
+from athena_core import PostInitMeta, setup_logger
+from data_models import AttentionTracker, GenerationResult
+from trajectory_storage import TrajectoryStore
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig, LogitsProcessorList
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class AttentionStep:
-    """Records attention information for a single generation step"""
-
-    step: int
-    token_id: str
-    token: str
-    position: int
-    attention_weights: list[list[float]]
-
-    def asdict(self):
-        return dataclasses.asdict(self)
+logger = setup_logger(__name__, "INFO")
 
 
-@dataclass
-class GenerationResult:
-    """Complete result from a generation with attention tracking"""
-
-    input_text: str
-    output_text: str
-    input_tokens: list[str]
-    output_tokens: list[str]
-    attention_steps: list[AttentionStep]
-    context_length: int
-    response: str = ""
-    tokens: list[str] = field(default_factory=list)
-    attention_weights: dict = field(default_factory=dict)
-
-
-class AttentionVisualizationAgent:
+class AttentionVisualizationAgent(metaclass=PostInitMeta):
     """
     Agent that generates text using Qwen3 0.6B while tracking attention weights
     """
@@ -54,31 +24,37 @@ class AttentionVisualizationAgent:
             verbose: Whether to print debug info
         """
         self.model_name = model_name
+        self.device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
         self.attention_layer_index = attention_layer_index
         self.verbose = verbose
-        # Detect device
-        self.device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-        logger.info("Initializing %s on %s.", self.model_name, self.device)
+        logger.info("Initializing %s on %s", self.model_name, self.device)
+
+    def __post_init__(self):
         # Load tokenizer and model
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
             dtype=torch.float32 if self.device == "cpu" else torch.float16,
             trust_remote_code=True,
             attn_implementation="eager",  # Enable attention output
         ).to(self.device)
-
         # Determine number of layers
-        self.num_layers = self._get_num_layers()
-        if self.num_layers:
-            logger.info("Model has %d layers", self.num_layers)
+        num_layers = None
+        if hasattr(self.model, "config"):
+            for attr in ["num_hidden_layers", "n_layer", "num_layers"]:
+                if hasattr(self.model.config, attr):
+                    num_layers = getattr(self.model.config, attr)
+                    logger.info("Model has %d layers", num_layers)
+                    break
+        self.num_layers = num_layers
 
         # Initialize attention tracker
         self.tracker = None
         self.conversation_history = []
+        # Initialize tracjectory storage
+        self.trajectory_store = TrajectoryStore(self.model_name, self.device)
 
     def generate_with_attention(
         self,
@@ -106,19 +82,54 @@ class AttentionVisualizationAgent:
             GenerationResult with tokens and attention information
         """
         # Tokenize input without truncation to preserve all tokens
-        input_tokens: BatchEncoding = self.tokenizer(prompt, return_tensors="pt", truncation=False).to(self.device)
-        context_length = input_tokens["input_ids"].shape[1]
-        print()
+        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=False).to(self.device)
+        input_tokens = inputs.tokens()
+        # Initialize tracker
+        self.tracker = AttentionTracker(self.tokenizer, len(input_tokens), self.verbose)
 
-        pass
+        # Set up generation config
+        generation_config = GenerationConfig(
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            do_sample=do_sample,
+            top_p=top_p,
+            repetition_penalty=1.1,
+        )
 
-    def _get_num_layers(self) -> Optional[int]:
-        """Get the number of transformer layers in the model"""
-        if hasattr(self.model, "config"):
-            for attr in ["num_hidden_layers", "n_layer", "num_layers"]:
-                if hasattr(self.model.config, attr):
-                    return getattr(self.model.config, attr)
-        return None
+        # Register attention hooks
+        hooks = []
+        hook_modules = []
+
+        # Find attention modules
+        for name, module in self.model.named_modules():
+            if any(pattern in name.lower() for pattern in ["attn", "attention", "self_attn"]):
+                if hasattr(module, "forward"):
+                    hook = module.register_forward_hook(self._capture_attention_hook)
+                    hooks.append(hook)
+                    hook_modules.append(name)
+        if self.verbose:
+            logger.info("Registered %d attention hooks", len(hook))
+
+        try:
+            # Generate with attention tracking
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    generation_config=generation_config,
+                    logits_processor=LogitsProcessorList([self.tracker]),
+                    output_attentions=True,
+                    output_scores=True,
+                    return_dict_in_generate=True,
+                )
+
+            # Process attention from generate output if available
+            if hasattr(outputs, "attentions") and outputs.attentions is not None:
+                self._process_generation_attentions(outputs.attentions, len(input_tokens))
+
+        finally:
+            # Remove hooks
+            for hook in hooks:
+                hook.remove()
 
 
 def demonstrate_attention_tracking():
@@ -126,6 +137,7 @@ def demonstrate_attention_tracking():
     print("=" * 80)
     print("Attention Visualization Demo")
     print("=" * 80)
+
     # Initialize agent
     agent = AttentionVisualizationAgent()
 
@@ -138,13 +150,24 @@ def demonstrate_attention_tracking():
     ]
 
     results = []
-    saved_files = []
     for i, (prompt, category) in enumerate(test_prompts, 1):
         print(f"\n--- Test {i}: {category} ---")
         print(f"Prompt: {prompt}")
         result = agent.generate_with_attention(
-            prompt, max_new_tokens=100, temperature=0.7, save_trajectory=True, category=category
+            prompt,
+            max_new_tokens=100,
+            temperature=0.7,
+            save_trajectory=True,
+            category=category,
         )
+        print(f"Response: {result.output_text}")
+        print(f"Input tokens: {len(result.input_tokens)}")
+        print(f"Output tokens: {len(result.output_tokens)}")
+        print(f"Attention steps tracked: {len(result.attention_steps)}")
+
+        results.append(result)
+        time.sleep(1)  # Ensure unique timestamps
+    return results
 
 
 if __name__ == "__main__":

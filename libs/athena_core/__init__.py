@@ -3,14 +3,17 @@ from typing import TYPE_CHECKING
 from athena_core._import_utils import import_attr
 
 if TYPE_CHECKING:
-    from athena_core.messages.base import BaseMessage
+    from athena_core.loggers import setup_logger
+    from athena_core.metas import PostInitMeta
 
 __all__ = [
-    "BaseMessage",
+    "setup_logger",
+    "PostInitMeta",
 ]
 
 _dynamic_imports = {
-    "BaseMessage": "base",
+    "setup_logger": "loggers",
+    "PostInitMeta": "metas",
 }
 
 
