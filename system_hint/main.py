@@ -1,4 +1,16 @@
 import argparse
+import sys
+
+from athena_core.loggers import setup_logger
+from system_hint.config import SystemHintConfig
+
+logger = setup_logger(__name__)
+
+def execute_single_task(task: str, config: SystemHintConfig):
+    
+
+def interactive_mode():
+    pass
 
 
 def main():
@@ -22,6 +34,22 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 
     args = parser.parse_args()
+
+    match args.mode:
+        case "single":
+            if not args.task:
+                logger.error("❌ Error: --task requried for `single` mode")
+                logger.info("Example: python main.py --mode single --task 'Create a hello world script'")
+                sys.exit(1)
+        case "sample":
+            pass
+        case "interactive":
+            interactive_mode()
+        case "demo":
+            pass
+        case _:
+            logger.error("Unsupported mode: %s", args.mode)
+            sys.exit(1)
 
 
 if __name__ == "__main__":
