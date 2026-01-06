@@ -3,13 +3,23 @@ from typing import Any, Callable, Literal, Optional
 
 
 class Tool:
+    class ParameterDict:
+        
+
+
+
+
+
+
+
     class Parameter:
         def __init__(
             self,
             name: str,
-            type: Literal["integer", "string", "boolean", "float"],
+            type: Literal["integer", "string", "boolean", "float", "array"],
             description: str,
             *,
+            items: Optional[Any] = None,
             enum: Optional[list] = None,
             required: bool = False,
             default: Any = None,
@@ -17,18 +27,24 @@ class Tool:
             self.name = name
             self.type = type
             self.description = description
+            self.items = items
             self.enum = enum
             self.required = required
             self.default = default
 
         def asdict(self, with_name: bool = False):
             d = dict(type=self.type, description=self.description)
+            if with_name:
+                d["name"] = self.name
+
             if not self.required:
                 d["default"] = self.default
             if not self.enum:
                 d["enum"] = self.enum
-            if with_name:
-                d["name"] = self.name
+
+            if self.type == "array" and not self.items:
+                d["items"] = self.items.asdict()
+
             return d
 
     def __init__(self, *, function: Callable, description: str, name: Optional[str] = None, parameters: list[Parameter] = None):

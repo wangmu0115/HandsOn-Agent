@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from _import_utils import import_attr
+from athena_core._import_utils import import_attr
 
 if TYPE_CHECKING:
     from athena_core.messages.ai import AIMessage

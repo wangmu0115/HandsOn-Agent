@@ -1,13 +1,26 @@
 import argparse
+import os
 import sys
 
+from agent import SystemHintAgent
 from athena_core.loggers import setup_logger
-from system_hint.config import SystemHintConfig
+from config import SystemHintConfig
 
 logger = setup_logger(__name__)
 
+
 def execute_single_task(task: str, config: SystemHintConfig):
-    
+    """Execute a single task with agent"""
+    api_key = os.getenv("KIMI_API_KEY")
+    if not api_key:
+        logger.error("Please Use `export KIMI_API_KEY='your-api-key'` command set KIMI_API_KEY env variable.")
+        sys.exit(1)
+    agent = SystemHintAgent(api_key, config=config)
+
+    print("\n🚀 Executing task...")
+    result = agent.execute_task(task, max_iterations=30)
+    return result
+
 
 def interactive_mode():
     pass
@@ -34,6 +47,10 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 
     args = parser.parse_args()
+
+    print("\n\n🤖" + "=" * 80)
+    print("  SYSTEM-HINT ENHANCED AGENT")
+    print("🤖" + "=" * 80)
 
     match args.mode:
         case "single":
